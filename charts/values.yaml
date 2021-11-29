@@ -1,0 +1,191 @@
+# Default prod values.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Every time you modify the values, you need to modify the changeCause to indicate the reason for the change
+changeCause: "charts for Geektime p8 homework"
+
+# Basic info
+Chart:
+  appversion: v1.0.0 # Your image's version
+  version: v1.0.0 # Your chart's version. Every time you modify values, you need to update a appropriate version number
+  releasename: httpdemo # Your release name, your chart's name
+  maintainers:
+    email: 1030728296@qq.com
+    name: ZhangSiming # Your name
+
+minReadySeconds: 0 # The time from the program's liveness health to service availability, generally set to 0
+progressDeadlineSeconds: 120 # How long the deployment stuck in a failed state it would be considered a failure
+revisionHistoryLimit: 7
+replicas: 1 # Number of desired pods, increase or decrease the number of pods as needed
+
+# Use strategy to configure rolling updates
+strategy:
+  type: "RollingUpdate" # RollingUpdate, Recreate
+  maxSurge: 1 # 1, 5, 10,  30%, 50%... The number of pods that can be created above the desired amount of pods during an update
+  maxUnavailable: 0 # 1, 5, 10,  30%, 50%... The number of pods that can be unavailable during the update process
+
+pod:
+  terminationGracePeriodSeconds: 30 # The time of pods exit gracefully
+  annotations: []
+
+nodeSelector: {} # Use nodeSelector for scheduling a pod to a special node
+
+tolerations:  # Use tolerations to tolerate some existing taints
+  - key: "environment"
+    operator: "Equal"
+    value: "production"
+    effect: "NoSchedule"
+
+# Image of your program
+image:
+  repository: "httpdemo" # do not add '/' to the end
+  pullPolicy: IfNotPresent # IfNotPresent, Always
+  # command: ["tini", "--"] # replace entrypoint in image, for example: command: ["echo"]
+  # args: ["python", "-m", "http.server", "8080"] # arguments for entrypoint, for example: args: ["arg1", "arg2"]
+
+# Whether to use init container(for downloading data or mounting Configuration)
+kubeInit:
+  enabled: false
+  image: "harbor.shannonai.com/shannon/kube-init:v1.2.6"
+  pullPolicy: IfNotPresent
+  command: []  # replace entrypoint in image, for example: command: ["echo"]
+  args: ["init"] # arguments for entrypoint, for example: args: ["arg1", "arg2"]
+
+# If the liveness probe fails, the container will be restarted
+livenessProbe: # {}
+  httpGet:
+    path: "/" # /health
+    port: 8081
+    scheme: HTTP
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+# tcpSocket example
+# readinessProbe:
+#   tcpSocket:
+#     port: 8080
+
+# If the readiness Probe fails, the container will be marked as unready
+readinessProbe: # {}
+  httpGet:
+    path: "/" # /health
+    port: 8081
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+ 
+# Setting the container's environment variables
+env: []
+# aliyu Log collection:
+# - name: aliyun_logs_log-stdout
+#   value: stdout
+#- name: "KEY1"
+#  value: "VALUE1"
+#- name: "KEY2"
+#  value: "VALUE2"
+
+# Exposing services
+service:
+  enabled: true
+  isHeadLess: false # Whether it is a headless service, used for DNS-based service discovery. Only effective in ClusterIP mode
+  type: NodePort # ClusterIP, NodePort
+  externalTrafficPolicy: Local # Local, Cluster. Only for type is NodePort
+
+# Multi-ports need to follow the same format, continue to configure, see the example below
+ports:
+  app: # Will be used as the name of the service(default "app"), just named as your application name
+    port: 8081 # The port exposed on the ClusterIP. Users in the cluster use <cluster ip>: <port> to access the service.
+    targetPort: 8081 # The port exposed on the pod, should be same as 'containerPort'(EXPOSED port in Dockerfile)
+    # nodePort: 8080 # The port exposed on the host machine, users outside the cluster use <host ip>: <nodePort> to access the service
+    protocol: TCP
+
+# Set the domain name
+ingress:
+  enabled: false # Set to false if external network access is not required
+  annotations:
+    kubernetes.io/ingress.class: traefik-internal
+  # traefik.ingress.kubernetes.io/app-root: your root uri
+  paths: ["/"] # Access path
+  hosts:
+    - example.shannonai.com # Domain name
+  servicePort: 8080 # Should be the same as '.Values.service.port'
+  tls: []
+
+# Resource limits for instances
+# After the chart is released, according to the actual resource occupation displayed in grafana, modify the resource request/limit in time to avoid resource wasting
+# monitor address: https://grafana-nx.shannonai.com
+resources: # {}
+  limits:
+    cpu: "300m" # CPU limit, such as 100m, 500m, 1, 2, ...
+    memory: "500Mi" # MEM limit, such as 50Mi, 1Gi
+    ephemeral-storage: "2Gi" # Disk limit(almost for temporary storage and log), such as 50Mi, 1Gi
+#   aliyun.com/gpu-mem: 6 # GPU-share
+  requests:
+    cpu: "100m" # 100m, 500m, 1, 2, ...
+    memory: "100Mi"
+    ephemeral-storage: "1Gi"
+
+volumeMounts:
+- name: data-volume
+  mountPath: /home/work/data
+- name: conf-volume
+  mountPath: /home/work/conf
+- name: logs-volume
+  mountPath: /home/work/logs
+# pvc volumeMounts example
+# - mountPath: "/var/www/html"
+#   name: mypvc
+# volumemount subpath example
+# - mountPath: /var/lib/xxx.conf
+#   name: xxx
+#   subPath: xxx.conf
+
+volumes:
+- name: data-volume
+  emptyDir: {} # If using PVC, please have a look at 'https://bit.ly/2YuDK3V'
+- name: conf-volume
+  emptyDir: {}
+- name: logs-volume
+  emptyDir: {}
+# pvc volumes example
+#  - name: mypvc
+#    persistentVolumeClaim:
+#      claimName: RELEASENAME
+
+pvc:
+  enabled: false # If you use an existing PVC, you can set it to false and modify the volumes above.
+  storageClass: "nfs-10-20-11-105" # aws-prod: nfs-10-20-11-105; aws-test: nfs-10-20-11-99; aliyun: alicloud-nas-pvc
+  accessMode: ReadWriteOnce # ReadWriteOnce, ReadOnlyMany, ReadWriteMany. The accessModes of PV and PVC must be the same
+  size: 8Gi
+
+pdb: # PodDisruptionBudget, used for pod active eviction protection, note that after pdb is determined, it cannot be updated
+  enabled: true
+  maxUnavailable: 1 # MaxUnavailable and minAvailable cannot be used at the same time. Values: 1, 30%, etc.
+  minAvailable: ""
+
+# The Horizontal Pod Autoscaler automatically scales the number of pods to avoid CPU/MEM utilization over 100%(request) when having a heavy pressusre
+# The min replica number is 1 and max number is 5
+# Set "hpa.enabled=true" to enable
+hpa:
+  enabled: false
+  minReplicas: 1 # Maximum and minimum number of replicas when scaling out
+  maxReplicas: 5 
+
+# Program's config file
+configmap:
+  enabled: true
+  content:
+    test.yaml: |
+      port:
+      log:
+      level:  # DEBUG, INFO, WARN, ERROR
+      encoding: json
+      outputPaths: ['logs/_release_name_must_startswith_chart_name_.log'] # only active in non-debug mode

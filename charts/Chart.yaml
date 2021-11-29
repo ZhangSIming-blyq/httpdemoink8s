@@ -1,0 +1,8 @@
+apiVersion: v1
+appVersion: latest
+description: A Helm chart for httpdemo
+maintainers:
+- email: 1030728296@qq.com
+  name: ZhangSiming
+name: httpdemo
+version: v1.0.0
